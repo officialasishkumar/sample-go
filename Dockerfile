@@ -29,7 +29,7 @@ WORKDIR /home/keploy/app
 
 COPY --from=build-stage --chown=keploy:keploy /app/. .
 
-RUN exec dumb-init su-exec keploy:keploy /home/keploy/app/main
+CMD ["dumb-init", "su-exec", "keploy:keploy", "/home/keploy/app/main"]
 
 # App port
 EXPOSE 8080

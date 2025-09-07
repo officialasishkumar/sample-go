@@ -5,9 +5,3 @@ services:
     container_name: dedup-go
     ports:
       - "8080:8080"
-    networks:
-      - keploy-network
-
-networks:
-  keploy-network:
-    external: true
