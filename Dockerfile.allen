@@ -1,0 +1,58 @@
+FROM 537984406465.dkr.ecr.ap-south-1.amazonaws.com/docker-hub/library/golang:1.23.0 AS builder
+
+#COPY /id_ed25519 /root/.ssh/id_ed25519
+#RUN chmod 600 /root/.ssh/id_ed25519
+#RUN ssh-keyscan github.com >> /root/.ssh/known_hosts
+
+ARG GIT_TOKEN
+ENV GOPRIVATE=github.com/Allen-Career-Institute/*
+ENV GOSUMDB=off
+
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && git config --global url."https://$GIT_TOKEN:@github.com/".insteadOf "https://github.com/" \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+#RUN git config --global url."ssh://git@github.com".insteadOf "https://github.com"
+
+COPY . /src
+WORKDIR /src
+
+RUN go env -w GOCACHE=/go-cache
+RUN go env -w GOMODCACHE=/gomod-cache
+RUN --mount=type=cache,target=/gomod-cache \
+  go mod download
+
+RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache \
+  GOPROXY=https://goproxy.cn make build
+
+
+
+FROM 537984406465.dkr.ecr.ap-south-1.amazonaws.com/docker-hub/library/debian:stable-slim
+
+ARG GO_VERSION=1.23.0
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        netbase \
+        curl \
+    && rm -rf /var/lib/apt/lists/ \
+    && curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz -o /tmp/go.tgz \
+    && tar -C /usr/local -xzf /tmp/go.tgz \
+    && ln -sf /usr/local/go/bin/go /usr/local/bin/go \
+    && rm -f /tmp/go.tgz
+
+ENV GOROOT=/usr/local/go
+ENV PATH="$PATH:/usr/local/go/bin"
+
+COPY ./config/ /data/conf/
+
+COPY --from=builder /src/bin /app
+COPY --from=builder /src/config /app/data/conf
+
+WORKDIR /app
+
+EXPOSE 8000
+EXPOSE 9000
+VOLUME /app/data/conf
+
+CMD ["./bff-layer", "-conf"]
